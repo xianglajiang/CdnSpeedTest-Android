@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CDN 测速</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; padding: 16px; }
+    .container { max-width: 500px; margin: 0 auto; }
+    h1 { text-align: center; margin-bottom: 16px; color: #333; }
+    .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .card-title { font-size: 16px; font-weight: bold; margin-bottom: 12px; color: #333; }
+    .input-group { margin-bottom: 12px; }
+    .input-group label { display: block; font-size: 14px; color: #666; margin-bottom: 4px; }
+    .input-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+    .btn { padding: 12px 20px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; width: 100%; margin-bottom: 8px; }
+    .btn-primary { background: #2196F3; color: white; }
+    .btn-success { background: #4CAF50; color: white; }
+    .btn-danger { background: #f44336; color: white; }
+    .btn-add { background: #FF9800; color: white; }
+    .cdn-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+    .cdn-item:last-child { border-bottom: none; }
+    .cdn-name { flex: 1; font-size: 14px; }
+    .cdn-ip { color: #2196F3; font-family: monospace; margin-right: 8px; }
+    .cdn-speed { color: #4CAF50; font-weight: bold; margin-right: 8px; }
+    .delete-btn { color: #f44336; cursor: pointer; padding: 4px 8px; }
+    .progress-bar { height: 4px; background: #e0e0e0; border-radius: 2px; margin-top: 8px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #2196F3; width: 0%; transition: width 0.3s; }
+    .result { margin-top: 12px; }
+    .result-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+    .result-ip { color: #333; }
+    .result-speed { color: #4CAF50; font-weight: bold; }
+    .empty { text-align: center; color: #999; padding: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 CDN 测速</h1>
+    
+    <!-- CDN 管理 -->
+    <div class="card">
+      <div class="card-title">📡 CDN 列表</div>
+      <div id="cdnList"></div>
+      <button class="btn btn-add" onclick="showAddDialog()">+ 添加 CDN</button>
+    </div>
+    
+    <!-- 测速配置 -->
+    <div class="card">
+      <div class="card-title">⚡ 测速配置</div>
+      <div class="input-group">
+        <label>测速 URL</label>
+        <input type="text" id="testUrl" placeholder="https://example.com/test.bin" value="https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png">
+      </div>
+      <div class="input-group">
+        <label>超时时间 (秒)</label>
+        <input type="number" id="timeout" value="10">
+      </div>
+      <button class="btn btn-success" onclick="startSpeedTest()">🚀 开始测速</button>
+    </div>
+    
+    <!-- 测速结果 -->
+    <div class="card">
+      <div class="card-title">📊 测速结果</div>
+      <div id="testResults"></div>
+    </div>
+  </div>
+  
+  <!-- 添加对话框 -->
+  <div id="addDialog" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5);">
+    <div style="background:white; margin:20px; padding:20px; border-radius:12px;">
+      <div class="card-title">添加 CDN</div>
+      <div class="input-group">
+        <label>名称</label>
+        <input type="text" id="newCdnName" placeholder="如: 阿里云北京">
+      </div>
+      <div class="input-group">
+        <label>IP地址</label>
+        <input type="text" id="newCdnIp" placeholder="如: 119.29.29.29">
+      </div>
+      <button class="btn btn-primary" onclick="addCdn()">保存</button>
+      <button class="btn btn-danger" onclick="hideAddDialog()">取消</button>
+    </div>
+  </div>
+  
+  <script>
+    // CDN 列表
+    let cdnList = [
+      { name: '阿里云DNS', ip: '223.5.5.5' },
+      { name: '腾讯云DNS', ip: '119.29.29.29' },
+      { name: '114DNS', ip: '114.114.114.114' },
+      { name: '百度DNS', ip: '180.76.76.76' }
+    ];
+    
+    // 加载 CDN 列表
+    function renderCdnList() {
+      const container = document.getElementById('cdnList');
+      if (cdnList.length === 0) {
+        container.innerHTML = '<div class="empty">暂无 CDN，请添加</div>';
+        return;
+      }
+      container.innerHTML = cdnList.map((cdn, i) => `
+        <div class="cdn-item">
+          <span class="cdn-name">${cdn.name}</span>
+          <span class="cdn-ip">${cdn.ip}</span>
+          <span class="delete-btn" onclick="deleteCdn(${i})">✕</span>
+        </div>
+      `).join('');
+    }
+    
+    // 显示添加对话框
+    function showAddDialog() {
+      document.getElementById('addDialog').style.display = 'block';
+    }
+    
+    // 隐藏添加对话框
+    function hideAddDialog() {
+      document.getElementById('addDialog').style.display = 'none';
+      document.getElementById('newCdnName').value = '';
+      document.getElementById('newCdnIp').value = '';
+    }
+    
+    // 添加 CDN
+    function addCdn() {
+      const name = document.getElementById('newCdnName').value.trim();
+      const ip = document.getElementById('newCdnIp').value.trim();
+      if (!name || !ip) {
+        alert('请填写名称和IP');
+        return;
+      }
+      cdnList.push({ name, ip });
+      renderCdnList();
+      hideAddDialog();
+    }
+    
+    // 删除 CDN
+    function deleteCdn(index) {
+      cdnList.splice(index, 1);
+      renderCdnList();
+    }
+    
+    // 测速
+    async function startSpeedTest() {
+      const testUrl = document.getElementById('testUrl').value.trim();
+      const timeout = parseInt(document.getElementById('timeout').value) * 1000;
+      
+      if (!testUrl) {
+        alert('请输入测速URL');
+        return;
+      }
+      
+      if (cdnList.length === 0) {
+        alert('请先添加CDN');
+        return;
+      }
+      
+      const results = [];
+      const container = document.getElementById('testResults');
+      container.innerHTML = '<div class="empty">测速中...</div>';
+      
+      for (let i = 0; i < cdnList.length; i++) {
+        const cdn = cdnList[i];
+        const speed = await testSpeed(cdn.ip, testUrl, timeout);
+        results.push({ ...cdn, speed });
+        
+        // 更新结果
+        container.innerHTML = results.map(r => `
+          <div class="result-item">
+            <span class="result-ip">${r.name} (${r.ip})</span>
+            <span class="result-speed">${r.speed ? r.speed + ' ms' : '超时'}</span>
+          </div>
+        `).join('');
+      }
+      
+      // 按速度排序
+      results.sort((a, b) => (a.speed || 999999) - (b.speed || 999999));
+      
+      container.innerHTML = '<div class="result-item" style="background:#e3f2fd;"><span>🏆 测速完成 (按延迟排序)</span></div>' + 
+        results.map((r, i) => `
+          <div class="result-item">
+            <span class="result-ip">${i+1}. ${r.name} (${r.ip})</span>
+            <span class="result-speed">${r.speed ? r.speed + ' ms' : '超时'}</span>
+          </div>
+        `).join('');
+    }
+    
+    // 单个测速
+    function testSpeed(ip, url, timeout) {
+      return new Promise((resolve) => {
+        const start = Date.now();
+        const img = new Image();
+        img.onload = () => resolve(Date.now() - start);
+        img.onerror = () => resolve(null);
+        img.src = url + '?t=' + Date.now();
+        setTimeout(() => resolve(null), timeout);
+      });
+    }
+    
+    // 初始化
+    renderCdnList();
+  </script>
+</body>
+</html>
